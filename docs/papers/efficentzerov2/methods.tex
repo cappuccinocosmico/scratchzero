@@ -1,0 +1,376 @@
+
+
+\section{Method}
+
+\subsection{Overview}
+% 这里主要介绍EZ是个啥，然后我们的算法实现了XXX
+% 
+% EZ-V2, built upon EfficientZero, serves as a general framework for sample-efficient RL across various types of domains. EfficientZero is a model-based algorithm that performs the planning using Monte-Carlo Tree Search in a learned environment model. 
+EZ-V2 is built upon EfficientZero, a model-based algorithm that performs planning using MCTS within a learned environment model. EZ-V2 successfully extends EfficientZero's high sample efficiency to various domains. To realize this extension, EZ-V2 addresses two pivotal questions:
+\begin{itemize}
+\item \textit{How to perform efficient planning using tree search in high-dimensional and continuous action spaces?}
+\item \textit{How to further strengthen the ability to utilize stale transitions under limited data?}
+\end{itemize}
+Specifically, we propose a series of improvements. We construct a sampling-based tree search for policy improvement in continuous control. Furthermore, we propose a search-based value estimation method to alleviate off-policy issues in replaying stale interaction data. The differences compared to EfficientZero are detailed in Appendix \ref{summary_diff}.
+% In the following, we introduce the EZ-V2 algorithm in detail.
+
+
+
+
+\subsection{Policy Learning with Tree Search} 
+% \wsj{under writing}
+% inner policy improvement 
+% outer policy improvement
+% 改名字 policy improvement with tree search; policy learning
+% 去掉对比部分 放到discussion里
+% 第一部分讲清楚tree search blabla 然后我们设计了bandit算法 similar to muzero 很好探索xxx； 然后 它没解决的continuous 环境； inspired sample muzero 然后blabla；
+% 讲完之后说提出细节的讲这两个部分 
+
+
+The policy learning in EZ-V2 consists of two stages: (i) \textit{obtaining the target policy from tree search} and (ii) \textit{supervised learning using the target policy}. The tree search method we propose guarantees policy improvement as defined in Definition \ref{def:PI} and enhances the efficiency of exploration in a continuous action space. The training objective aims to refine the policy function by aligning it with the target policy obtained from the tree search.
+
+\begin{definition}[\textbf{Policy Improvement}]
+\label{def:PI}
+\textit{A planning method over actions satisfies policy improvement if the following inequality holds at any given state \( s \).}
+\begin{equation}
+\label{PI}
+     q(s,a^*_{S}) \geq \mathbb{E}_{a \sim p_t}[q(s,a)]
+\end{equation}
+\textit{where \( a^*_S \) is the recommended action from the planning method, \( p_t \) is the current policy, and \( q \) is the Q-value function with respect to \( p_t \).}
+\end{definition}
+
+% \textit{If the tree search’s action selection produces a policy improvement, then}
+% The left-side of the expectation operator means the planning method can be stochastic.
+
+\subsubsection{Target Policy from Tree Search}
+
+% 介绍pipeline 简单介绍过程
+% introduce a search  based on gumbel 
+
+% Due to the introduction of model-based learning, we can obtain a predicted model of the environment. By generating the imagined trajectories, we can realize the long-term evaluation of the actions obtained from the policy function. 
+% Expanding nodes in tree search methods resembles generating possible trajectories. 
+% Thus, we design a tree search method, namely sampling-based Gumbel search. 
+
+In this paper, we choose the tree search method as the improvement operator, which can construct a locally superior policy over actions (policy improvement) based on a learned model. Each node of the search tree is associated with a state \( s \), and an edge is denoted as \( (s,a) \). The tree stores the estimated Q-value of each node and updates it through simulations. Finally, we select an action that strikes a balance between exploitation and exploration, based on the Q-value.
+
+
+
+More specifically, the basic tree search method we adopt is the Gumbel search \citep{danihelka2021policy}. This method is recognized for its efficiency in tree searching and its guarantee of policy improvement. At the onset of a search process, the Gumbel search samples \( K \) actions using the Gumbel-Top-k trick (Section \ref{main_gumbel_topk}). It then approaches the root action selection as a bandit problem, aiming to choose the action with the highest Q-value. To evaluate the set of sampled actions, we employ a bandit algorithm known as Sequential Halving \citep{karnin2013almost}. However, the Gumbel search primarily investigates planning in discrete action spaces.
+
+% represents the maximum point of the Q-value at the root node. 
+
+% More specifically, the basic tree search method we choose is the Gumbel search \citep{danihelka2021policy}. It is an efficient tree search method and guarantees policy improvement. At the beginning of a search process, Gumbel search samples $K$ actions using Gumbel-Top-k trick (Appendix \ref{gumbel_topk}). Then it formulates the root action selection as a bandit problem. The objective of the bandit is to choose the action with the highest Q-value.
+% A bandit algorithm, Sequential Halving, was employed to progressively evaluate the set of sampled actions. 
+% However, their method mainly investigates the planning in discrete action space.
+% A $K$-armed bandit is a vector of Q-values of $K$ actions.
+% The action selection process is equivalent to find the argument of maximum of the Q-value manifold, thus maintaining the policy improvement. 
+% To support high-dimensional continuous control, we design a sampling-based Gumbel search. Fig. \ref{framework} (B) illustrates the process of the sampling-based Gumbel search.
+
+% 这里需要讲的更有趣一些
+
+% In the following, we focus on the procedure in continuous control. we propose an action sampling method that achieves excellent exploration ability, as well as makes the search method satisfy policy improvement in Definition \ref{def:PI}.
+To support high-dimensional continuous control, we design a sampling-based Gumbel search, as depicted in Fig. \ref{framework} (B). Given the challenges posed by high-dimensional and large continuous action spaces, striking a balance between exploration and exploitation is crucial for the performance of tree search, especially when using a limited number of sampled actions. To address this challenge, we propose an action sampling method that not only achieves excellent exploration capabilities but also ensures that the search method satisfies policy improvement as defined in Definition \ref{def:PI}.
+
+
+% Given any state $s$, we sample $K$ actions, which form an action set $A_S$. 
+% The action set $A_S$ consists of two action sets, $A_{S1}$ and $A_{S2}$.
+% $A_{S1}$ is sampled from the current policy $p_t$, and the action set $A_{S2}$ comes from any other distribution. 
+Our method is implemented as follows. Given any state \( s \), we sample \( K \) actions. A portion of these actions originates from the current policy \( p_t \), while another portion is sampled from a prior distribution \( p^\prime_t \). We denote the complete action set as \( A_S = [A_{S1}, A_{S2}] \), where \( A_{S1} \) and \( A_{S2} \) represent the two portions, respectively. This design enhances exploration because \( A_{S2} \) can introduce actions that have a low prior under the current policy \( p_t \). 
+The bandit process then selects the action \( a^*_S \) from the action set \( A_S \) with the highest \( q(s,a) \), expressed as \( a^*_S = \arg\max_{a \in A_S}(q(s,a)) \). This process guarantees policy improvement as outlined in Definition \ref{def:PI}, because:
+\begin{equation}
+\label{q_pi}
+\begin{split}
+    q(s,a^*_S ) & \geq \max \left( \frac{\sum_{a \in A_{S1}} q(s,a)}{|A_{S1}|}, \frac{\sum_{a \in A_{S2}} q(s,a)}{|A_{S2}|}  \right) \\
+    & \geq \frac{\sum_{a \in A_{S1}} q(s,a)}{|A_{S1}|} \\
+    & = \mathbb{E}_{a\sim p_t }[q(s, a)] , \ \  \text{as} \ \  |A_{S1}| \rightarrow \infty
+\end{split}
+\end{equation}
+where \( |A_{S1}| \) represents the number of actions in \( A_{S1} \). The first line holds because \( a^*_S \) is the action with the highest \( q(s,a) \) in \( A_S \) and \( [A_{S1}, A_{S2}] = A_S \). We apply the law of large numbers to transition from line 2 to 3.
+In practical implementation, we model the current policy \( p_t \) as a Gaussian distribution, and the sampling distribution \( p^\prime_t \) is a flattened version of the current policy. Our experiments demonstrate that this design facilitates exploration in continuous control.
+
+% This holds for any $A_S$ sampled from the current policy $p_t$. 
+% Meanwhile, only if $A_S$ contains the samplings from the current policy $p_t$, Equation \eqref{PI} holds for expectation. 
+% Intuitively, when $A_S$ contains all samples in $p_t$, the highest Q-value in $A_S$ is better than the expectation of Q-value under $p_t$.
+% That brings an advantage for exploration. 
+% We can add some actions with low prior under the current policy, and the policy improvement still holds. 
+% In practical implementation, we model the current policy $p_t$ as a Gaussian distribution, and the prior distribution $P$ is a mixed Gaussian distribution. 
+% In practice, we find that sampling $A_S'$ from a wilder distribution $p_t'$ is beneficial for exploration.
+% Sampling from a wilder distribution means a portion of the actions comes from the current policy $p_t$, while another portion comes from the current policy with 3 times standard derivation. 
+% Furthermore, sampling from a wilder distribution still guarantees policy improvement if and only if $p_t'$ envelopes $p_t$ and $A_S\subset A_S'$, because
+% \begin{equation}
+% \label{q_pi}
+%     q(s,\underset{a \in A_S'\sim p_t'}{\arg \max}(\sigma(q(s,a))) )\geq \mathbb{E}_{a\in A_S\sim p_t}q(s, a)
+% \end{equation}
+% reduce variance for 
+
+For action sampling at non-root nodes, we modify the sampling method to reduce the variance in the estimation of Q-values. Specifically, actions at non-root nodes are sampled solely from the current policy \( p_t \). Additionally, the number of actions sampled at non-root nodes is fewer than those at the root node. This reduction in the number of sampled actions at non-root nodes facilitates an increase in search depth, thereby avoiding redundant simulations on similar sampled actions.
+
+Upon completing the sampling-based Gumbel search, we obtain the target policy. We construct two types of target policies. The first is the recommended action \( a^*_S \) obtained from the tree search. In addition to \( a^*_S \), the search also yields \( q(s,a) \) for the visited actions. To smooth the target policy, we build the second type as a probability distribution based on the Q-values of root actions (for more details, see Appendix \ref{cal_ip}).
+
+
+% For the action sampling in non-root nodes, we modify the sampling method to reduce variance in the estimation of Q-values. 
+% To be specific, non-root actions are only sampled from the current policy $p_t$. At the same time, the number of sampled actions is many times fewer than the actions in the root node. Reducing the number of sampled actions in non-root nodes benefits the increase of the search depth, which avoids redundant simulations on similar sampled actions. 
+% % Intuitively, with the decreasing of standard derivation, most samplings from Gaussian distribution become very similar, leading to close Q-values. Thus, the evaluation of non-root nodes does not need to expand a large amount of children. 
+
+% Once the sampling-based Gumbel search has been completed, we can obtain the target policy.
+% We construct two types of target policy. One of them is the recommended action $a^*_S$ obtained from tree search. Besides $a^*_S$, the search also gives us $q(s,a)$ for the visited actions. To make the target policy smoother, we build the other target policy as a probability distribution based on Q-values of root actions (more details see Appendix \ref{cal_ip}).
+% full policy more smooth
+
+% Because the action space is continuous, the sampling process naturally maintains the property without replacement. 
+
+
+
+% In the following, we introduce the brief process of our tree search method. First, every node of the search tree is associated with an state, and the root node is the current state $s_t$. 
+% % For each action $a$ from $s$ there is an edge $(s,a)$. 
+% The search needs to cost many simulations. Each simulation in the search creates a path, starting from the root node to a newly expanded node. The Q values of all visited nodes in the path are updated using predicted reward and value based on the Bellman equation.
+% Through many simulations, we can obtain a stochastic estimate of the Q-value. Obviously, the estimate would be better, if visiting a node multiple times.
+% To choose which nodes to visit and how many times, we use a bandit algorithm to select actions in the root node. Inspired by Gumbel Muzero \citep{danihelka2021policy}, the Sequential Halving algorithm we choose optimizes a simple regret, to efficiently explore the set of sampled actions. The regret is related to the Q values.
+% Furthermore, the previous tree search method mainly considers the planning in discrete action space.
+% To master high-dimensional continuous control, we use a sampling-based method to obtain the action candidates in each node.  
+% Besides, Fig. \ref{framework} (B) illustrates the process of the sampling-based Gumbel search. 
+
+% We propose a sampling-based Gumbel search . Similar to MCTS, the method expands a tree to evaluate the action candidates in the action space via a learned model. 
+% it needs a large number of simulations to select actions at the root node.
+% To target the problems, we make some improvements to the action sampling and the action selection in tree search.
+% Our method first samples action candidates without replacement in both continuous and discrete distributions. Secondly, we use a bandit algorithm optimizing simple regret to efficiently explore the set of sampled actions. The PUCB algorithm in EfficientZero aims to optimize cumulative regret to select actions, thus leading to more computations. Finally, we can obtain the best action resulting from the search procedure with the bandit algorithm. Fig. \ref{framework} (B) illustrates the process of the sampling-based Gumbel search. 
+
+% In the following, we introduce the action sampling and selection in more detail. 
+% Basically, we make some modifications to the action sampling and selection. 
+% For the action sampling from discrete distributions, we use Gumbel-Top-k trick to sample $K$ action without replacement, as defined in Section \ref{gumbel_topk}. The sampling without replacement reduces the redundant simulations toward the same action in further search. For continuous control, we sample $K$ actions from a prior distribution.  
+% Then, we denote $\hat{p}=\frac{1}{N} \sum_i \delta_{a, a^i}$ as the corresponding empirical distribution which is non-zero only on the sampled actions $a^i$. It corresponds to the prior distribution of sampled actions in Gumbel-Top-k trick. 
+% For the action selection in root nodes, the bandit algorithm we choose is Sequential Halving \citep{karnin2013almost} inspired by Gumbel Muzero \citep{danihelka2021policy}.
+% The key advantage is the method is easy to tune without problem-dependent hyperparameters. 
+% For the action selection, each phase in Sequential Halving aims to select the top $m$ action candidates from the sampled actions.
+% \begin{equation}
+%     a^1,...,a^m = \underset{a^1,...a^K}{\text{argtop}}(g_c(a),m)
+% \end{equation}
+% where $g_c(a)$ is represented as the Gumbel score of the selected action. In continuous control, the Gumbel score is a monotonically increasing transformation with the expected Q-value. 
+% In discrete control, the Gumbel score adds the Gumbel noise and the logit of action due to the Gumbel-Top-K trick \citep{kool2019stochastic}. The halving process will repeat until the budget of simulations is used up or there is only one candidate left. Finally, we obtain the recommended action $a^*_S$ to interact with the environment. 
+
+% \textbf{Remark:} \textit{
+% We prove the theoretical policy improvement in the sampling-based Gumbel search, as shown in Equation \eqref{PI}. Notably, our method does not make any requirements on the type of sampling distribution. The detailed proof is provided in Appendix \ref{policyproof}. 
+% }
+
+% For the non-root nodes in the simulation, we follow the setting in Gumbel Muzero \citep{danihelka2021policy}. The main difference is that the sampled action is 4 times less than the action candidates in the root node. In practice, reducing the number of sampled actions can increase the depth of the search. The method avoids redundant simulations on similar sampled actions. 
+
+% according to 
+% \begin{equation}
+%     a^1,...,a^m = \text{argtop}(g+logits+\sigma(\hat{q}),m)
+% \end{equation}
+% where $g+logits+\sigma(\hat{q})$ is represented as the Gumbel score $g_c(a)$ of the selected action. 
+% In continuous control, the Gumbel score is only calculated by $\sigma(\hat{q})$. Due to sampling from Gaussian, the first gumbel noise term $g$ is removed. 
+% Due to sampling from Gaussian, the first gumbel noise term $g$ is removed. 
+% \ywr{Is it necessary to mention the following?} 
+% In addition, the empirical distribution $\hat{p}$ is a uniform distribution, so $logits$ for all action candidates are the same. 
+% The halving process will repeat until the budget of simulations is used up or there is only one candidate left. Finally, we obtain the best action $a^*_S$ to interact with the environment. 
+
+% Meanwhile, the improved policy is constructed as: 
+% \begin{equation}
+%     \pi^{\prime}=\text{softmax}(logits+\sigma(\text{completedQ}))
+% \end{equation}
+% where completedQ is a comprehensive value estimation of visited and unvisited candidates. The completed Q-values give zero advantage to the unvisited actions.
+% More details about the completed Q-values can be found in Gumbel Muzero \citep{danihelka2021policy}. 
+
+
+% Specifically, we build the improved policy $\pi^\prime$ by using the completed Q-values. 
+% Then we expand the non-root nodes by aligning the visit count distribution with the improved policy prior, to avoid variance via direct sampling. More details can be found in Gumbel Muzero \citep{danihelka2021policy}.
+
+
+
+\subsubsection{Learning using Target Policy}
+In this part of the process, we distill the target policy \( \pi_t \) into the learnable policy function \( p_t \). We aim to minimize the cross-entropy between \( p_t \) and the target policy \( \pi_t \):
+\begin{equation}
+\label{ce_loss}
+    \mathcal{L}_{\mathcal{P}}(p_t, \pi_t) = \mathbb{E}_{a \sim \pi_t}\left[-\log p_t (a) \right]
+\end{equation}
+Additionally, in high-dimensional action spaces, we utilize the other target \( a^*_S \):
+\begin{equation}
+    \label{simple_loss}
+    \mathcal{L}_{\mathcal{P}}(p_t, a^*_{S})=-\log p_t\left(a^*_{S}\right)
+\end{equation}
+Compared with Equation \eqref{ce_loss}, Equation \eqref{simple_loss} facilitates early exploitation in tasks with a large action dimension, such as the `Quadruped walk' in DM Control \citep{tassa2018deepmind}. We provide an intuitive example to illustrate its advantage in Appendix \ref{simplepi}.
+
+
+% In this part, we distil the target policy $\pi_t$ into the learnable policy function $p_t$. We minimize the cross-entropy between $p_t$ and the target policy $\pi_t$:
+% \begin{equation}
+% \label{ce_loss}
+%     \mathcal{L}_{\mathcal{P}}(\pi_t,p_t) = \mathbb{E}_{a \sim \pi_t}\left[-\log p_t (a) \right]
+% \end{equation}
+% Additionally, we use the other target $a^*_S$ in high-dimensional action space:
+% \begin{equation}
+%     \label{simple_loss}
+%     \mathcal{L}_{\mathcal{P}}(p_t)=-\log p_t\left(a^*_{S}\right)
+% \end{equation}
+% Compared with Equation \eqref{ce_loss}, Equation \eqref{simple_loss} benefits the early exploitation in the task with a large action dim, such as Quadruped walk in DM control. We provide an intuitive example to illustrate its advantage in Appendix \ref{simplepi}.
+
+
+
+
+
+
+
+
+\subsection{Search-based Value Estimation}
+
+
+Improving the ability to utilize off-policy data is crucial for sample-efficient RL. Sample-efficient RL algorithms often undergo drastic policy shifts within limited interactions, leading to estimation errors for early-stage transitions in conventional methods, such as \( N \)-step bootstrapping and TD-\( \lambda \). EfficientZero proposed an adaptive step bootstrapping method to alleviate the off-policy issue. 
+However, this method utilizes the multi-step discount sum of rewards from an old policy, which can lead to inferior performance. Therefore, it is essential to enhance value estimation to better utilize stale transitions.
+
+% \ywr{Be precise.}
+% Improving the ability for utilizing off-policy data is crucial to sample-efficient RL. Sample efficient RL algorithms typically experience drastic policy shifts within limited interactions, leading to the estimation errors for early-stage transitions of conventional methods, such as $N$-step bootstrapping and TD-$\lambda$. EfficientZero proposed an adaptive step bootstrapping method to alleviate the off-policy issue. 
+% However, the multi-step discount sum of reward is derived from the old policy in the method, leading to inferior performance.
+% Therefore, it is necessary to improve the value estimation for better utilizing the stale transitions.
+
+% However, it only partially resolved this problem, leading to inferior performance.
+% Policy reanalyze, proposed by MuZero, is a policy improvement method for limited data settings, which uses the latest model to calculate the improved target policy on stale data. Inspired by policy reanalyze, we raise a question: 
+% \textit{Can we re-estimate values just like the way of policy reanalyze?} 
+% This is because the search process not only outputs an improved policy, but also the empirical mean estimations of root values, which are, however, not utilized previously due to mistrusts in the model accuracy. We now employ these empirical estimations as target values, without introducing any additional calculation.
+
+% We attribute the core of this issue to using outdated environment reward to estimate the value of the current policy.
+% Compared to the adaptive step bootstrapping method of EfficientZero \citep{ye2021mastering}, which did not completely resolve the problem and led to inferior performance, 
+We propose leveraging the current policy and model to conduct value estimation, which we term \textbf{Search-Based Value Estimation (SVE)}. The expanding search tree generates imagined trajectories that provide bootstrapped samples for root value estimations. We now use the mean of these empirical estimations as target values. Notably, this value estimation method can be implemented within the same process as the policy reanalysis proposed by MuZero \citep{schrittwieser2021online}, thereby not introducing additional computational overhead.
+% , which has been applied in EfficientZero
+% We name this method as \textbf{Search-Based Value Estimation (SVE)}. 
+% SVE improves value estimations by utilizing current policy, as well as the learned dynamic model, to re-estimate empirical values through a meticulous search process, as shown in the bottom of Fig. \ref{framework} (B). 
+The mathematical definition of SVE is as follows.
+% The specific calculation can be found in Appendix \ref{cal_sve}.
+\begin{definition}[\textbf{Search-Based Value Estimation}]
+\label{def:sve}
+\textit{Using imagined states and rewards $\hat{s}_{t+1}, \hat{r}_t=\mathcal{G}(\hat{s}_t,\hat{a}_t)$ obtained from our learnable dynamic function, 
+% the search-based value estimation of a given state $s_0$ is defined as
+the value estimation of a given state $s_0$ can be derived from the empirical mean of $N$ bootstrapped estimations, which is formulated as
+}
+\begin{equation}
+    \hat{V}_\text{S}(s_0)=\frac{\sum_{n=0}^{N}\hat{V}_n(s_0)}{N}
+\end{equation}
+\textit{where $N$ denotes the number of simulations, $\hat{V}_n(s_0)$ is the bootstrapped estimation of the $n$-th node expansion, which is formulated as }
+\begin{equation}            \hat{V}_n(s_0)=\sum_{t=0}^{H(n)}\gamma^t\hat{r}_t+\gamma^{H(n)}\hat{V}(\hat{s}_{H(n)})
+\end{equation}
+\textit{where $H(n)$ denotes the search depth of the $n$-th iteration.}
+\end{definition}
+
+Through the imagined search process with the newest policy and model, SVE provides a more accurate value estimation for off-policy data. Furthermore, investigating the nature of estimation errors is critical. We derive an upper bound for the value estimation error, taking into account model errors, as illustrated in Theorem \ref{theorem:sve_error}.
+
+% Inspired by the proof in \citep{feinberg2018model}, 
+
+% \begin{theorem}[\textbf{Search-Based Value Estimation Error}]
+% \label{theorem:sve_error}
+\begin{corollary}[\textbf{Search-Based Value Estimation Error}]
+\label{theorem:sve_error}
+    Define $s_t,a_t,r_t$ to be the states, actions, and rewards resulting from current policy $\pi$ using true dynamics $\mathcal{G}^*$ and reward function $\mathcal{R}^*$, starting from $s_0\sim\nu$ and similarly define $\hat{s}_t, \hat{a}_t, \hat{r_t}$ using learned function $\mathcal{G}$. Let reward function $\mathcal{R}$ to be $L_r-Lipschitz$ and value function $\mathcal{V}$ as $L_V-Lipschitz$. Assume $\epsilon_s, \epsilon_r, \epsilon_v$ as upper bounds of state transition, reward, and value estimations respectively. We define the error bounds of each estimation as
+    % \begin{equation}
+    %     \max_{n\in[N],t\in[H(n)]}\mathbb{E}\left[\Vert\hat{s}_t-s_t\Vert^2\right]\leq\epsilon^2
+    % \end{equation}
+    \begin{gather}
+        \max_{n\in[N],t\in[H(n)]}\mathbb{E}\left[\Vert\hat{s}_t-s_t\Vert^2\right]\leq\epsilon_s^2 \\
+        \max_{n\in[N],t\in[H(n)]}\mathbb{E}\left[\Vert\mathcal{R}(s_t)-\mathcal{R}^*(s_t)\Vert^2\right]\leq\epsilon_r^2 \\
+        \max_{n\in[N],t\in[H(n)]}\mathbb{E}\left[\Vert\mathcal{V}(s_t)-\mathcal{V}^*(s_t)\Vert^2\right]\leq\epsilon_v^2
+    \end{gather}
+    within a tree-search process. Then we have errors
+    \begin{equation}
+    \begin{aligned}
+        &\text{MSE}_\nu(\hat{V}_\text{S})\\
+        &\leq\frac{4}{N^2}\sum_{n=0}^N\left(\sum_{t=0}^{H(n)}\gamma^{2t}(L_r^2\epsilon_s^2+\epsilon_r^2)+\gamma^{2H(n)}(L_V^2\epsilon_s^2+\epsilon_v^2)\right)
+    \end{aligned}
+    \end{equation}
+    % Notably, the coefficient of $\epsilon^2$ 
+    % \begin{equation*}
+    %     \frac{2}{N^2}\sum_{n=0}^N\left(\sum_{t=0}^{H(n)}\gamma^{2t}L_r^2+\gamma^{2H(n)}L_V^2\right)
+    % \end{equation*}
+    % is convergent with $H(n)$. Additionally, 
+    where $N$ is the simulation number of the search process. $H(n)$ denotes the depth of the $n$-th search iteration.
+    % The upper bound will converge to 0 when the dynamic function is approximately optimal $\epsilon\to 0$.
+\end{corollary}
+
+The detailed proof can be found in Appendix \ref{app:theorem:sve_error}. SVE possesses several advantageous properties, such as a convergent series coefficient and bounded model errors. Intuitively, the estimation error bound will converge to 0 when the dynamic function approaches optimality, denoted as \(\epsilon \to 0\).
+
+% Although the convergence speed of the dynamic funciton varies for tasks with different difficulty levels, we demonstrate that the SVE method consistently outperform the previous adaptive bootstrap method proposed in EfficientZero \citep{ye2021mastering}.
+
+% However, the model inaccuracy in the early training stage will introduce significant errors into SVE, which leads to unsatisfying performance. In addition, the SARSA targets are not inferior to SVE when replaying recently collected data since this situation could be considered as on-policy.
+% The convergence speed of the dynamic function varies for tasks with different difficulty levels, which could introduce model errors into value estimations in the early training stage. The direct usage of search-based estimations could harm the performance in the whole training. 
+Theorem \ref{theorem:sve_error} shows that model inaccuracies can amplify SVE's estimation error, especially in the early training stages or when sampling fresh transitions. To address this, we introduce a mixed value target, combining multi-step TD-targets for early training and fresh experience sampling. The mixed target is defined as:
+\begin{equation}
+    V_{mix}=\begin{cases}
+        \sum_{i=0}^{l-1}\gamma^i u_{t+i}+\gamma^l v_{t+l}, & \text{if } i_t<T_1 \  \\ &\text{or} \ i_s>|D|-T_2\\
+        \hat{V}_\text{S}, & \text{otherwise}
+    \end{cases}
+\end{equation}
+Here, \( l \) is the horizon for the multi-step TD method. The variable \( i_t \) denotes the current training step, while \( T_1 \) refers to the initial steps. The term \( i_s \) indicates the sampling index from the buffer. The buffer size is represented by \( |D| \), and \( T_2 \) is the designated threshold for assessing the staleness of data. More details can be found in Appendix \ref{mixedV}.
+
+
+
+% \subsection{Architecture}
+% \subsection{Discussion}
+
+% In this section, we describe the differences between previous works, such as DreamerV3 \citep{hafner2023mastering}, TD-MPC2 \citep{Anonymous2023TDMPC2}, and Muzero-series work \cite{ye2021mastering, danihelka2021policy,hubert2021learning}.
+
+% DreamerV3 and TD-MPC2 train the agent using actor-critic learning together with a learned model.
+% Although long-horizon planning improves the quality of collected data in DreamerV3 \citep{hafner2023mastering}, the imagination horizon $H=15$ is too long to control the model compounding error.  
+% TD-MPC2 \citep{Anonymous2023TDMPC2} uses shorter horizon of 3 to implement planning. But Model Predictive Control in their method creates 100 times larger imagined trajectories to choose actions than our tree search approach. 
+
+% EfficientZero \citep{ye2021mastering}, Gumbel Muzero \citep{danihelka2021policy}, and Sample Muzero \citep{hubert2021learning} all apply the tree search method to find promising actions and improve policy.
+% The original MCTS in EfficientZero was only applied to domains with relatively small action spaces. Gumbel Muzero replaces MCTS with Gumbel search to achieve reduced simulations and policy improvement guarantees, but does not extend to the continuous setting.
+% Although Sample Muzero \cite{hubert2021learning} designs a sampling-based MCTS, which is capable for resolving continuous control, it still requires intensive simulations and is inferior in sample efficiency.
+% In summary, our method achieves superior performance with limited data and across domains than other Muzero-series work. Besides, the method uses 2 times fewer simulations than the original MCTS benefit from the Gumbel search. 
+
+
+% EfficientZero and Gumbel Muzero don't extend them to the continuous control setting, while Sample Muzero demonstrates that action sampling can perform continuous control using tree search. 
+% In contrast to Sample Muzero \citep{hubert2021learning}, our method handles high-dimensional and continuous action space using 2 times less simulations. 
+
+
+% \ywr{Training, reanalyzing and evaluation of EZ-V2?} 
+
+
+
+\begin{table*}[ht]
+    \caption{Scores achieved on the Atari 100k benchmark indicate that EZ-V2 achieves super-human performance within just 2 hours of real-time gameplay. Our method surpasses the previous state-of-the-art, EfficientZero. The results for Random, Human, SimPLe, CURL, DrQ, SPR, MuZero, and EfficientZero are sourced from \citep{ye2021mastering}.}
+    \label{tab:atari_results_full}
+\begin{center}
+\begin{small}
+% \begin{sc}
+\centering
+\scalebox{0.8}{
+\centering
+\begin{tabular}{lccccccccccr}
+\toprule
+Game &                  Random &    Human &   SimPLe &     CURL &      DrQ &     SPR & MuZero & EfficientZero & DreamerV3 & BBF & \textbf{EZ-V2 (Ours)}\\
+\midrule
+Alien               &    227.8 &   7127.7 &    616.9 &   558.2 &    771.2 &   801.5 & 530.0 & 808.5 & 959 & \underline{1173.2} & \textbf{1557.7} \\
+Amidar              &      5.8 &   1719.5 &     88.0 &   142.1 &    102.8 &   176.3 & 38.8 & 148.6 & 139 & \textbf{244.6} & \underline{184.9} \\
+Assault             &    222.4 &   742.0 &    527.2 &   600.6 &    452.4 &   571.0 & 500.1 & 1263.1 & 706 & \textbf{2098.5} & \underline{1757.5} \\
+Asterix             &    210.0 &   8503.3 &   1128.3 &   734.5 &    603.5 &   977.8 & 1734.0 & \underline{25557.8} & 932 & 3946.1 & \textbf{61810.0} \\
+Bank Heist          &     14.2 &    753.1 &     34.2 &   131.6 &    168.9 &   380.9 & 192.5 & 351.0 & 649 & \underline{732.9} & \textbf{1316.7} \\
+BattleZone          &   2360.0 &  37187.5 &   5184.4 &  14870.0 &  12954.0 & 16651.0 & 7687.5 & 13871.2 & 12250 & \textbf{24459.8} & \underline{14433.3} \\
+Boxing              &      0.1 &     12.1 &      9.1 &     1.2 &      6.0 &    35.8 & 15.1 & 52.7 & 52.7 & \textbf{85.8} & \underline{75.0} \\
+Breakout            &      1.7 &     30.5 &     16.4 &     4.9 &     16.1 &    17.1 & 48.0 & \textbf{414.1} & 31 & 370.6 & \underline{400.1} \\
+ChopperCmd           &    811.0 &   7387.8 &   1246.9 &  1058.5 &    780.3 &   974.8 & \underline{1350.0} & 1117.3 & 420 & \textbf{7549.3} & 1196.6 \\
+Crazy Climber       &  10780.5 &  35829.4 &  62583.6 & 12146.5 &  20516.5 & 42923.6 & 56937.0 & 83940.2 & \underline{97190} & 58431.8 & \textbf{112363.3} \\
+Demon Attack        &    152.1 &   1971.0 &    208.1 &   817.6 &    1113.4&   545.2 & 3527.0 & 13003.9 & 303 & \underline{13341.4} & \textbf{22773.5} \\
+Freeway             &      0.0 &     29.6 &     20.3 &    \textbf{26.7} &      9.8 &    24.4 & 21.8 & 21.8 & 0 & \underline{25.5} & 0.0 \\
+Frostbite           &     65.2 &   4334.7 &    254.7 &  1181.3 &    331.1 &  \underline{1821.5} & 255.0 & 296.3 & 909 & \textbf{2384.8} & 1136.3 \\
+Gopher              &    257.6 &   2412.5 &    771.0 &   669.3 &    636.3 &   715.2 & 1256.0 & 3260.3 & \underline{3730} & 1331.2 & \textbf{3868.7} \\
+Hero                &   1027.0 &  30826.4 &   2656.6 &  6279.3 &   3736.3 &  7019.2 & 3095.0 & 9315.9 & \textbf{11161} & 7818.6 & \underline{9705.0} \\
+Jamesbond           &     29.0 &    302.8 &    125.3 &   \underline{471.0} &    236.0 &   365.4 & 87.5 & 517.0 & 445 & \textbf{1129.6} & 468.3 \\
+Kangaroo            &     52.0 &   3035.0 &    323.1 &   872.5 &    940.6 &  3276.4 & 62.5 & 724.1 & \underline{4098} & \textbf{6614.7} & 1886.7 \\
+Krull               &   1598.0 &   2665.5 &   4539.9 &  4229.6 &   4018.1 &  3688.9 & 4890.8 & 5663.3 & 7782 & \underline{8223.4} & \textbf{9080.0}\\
+Kung Fu Master      &    258.5 &  22736.3 &  17257.2 &  14307.8 &   9111.0 & 13192.7 & 18813.0 & \textbf{30944.8} & 21420 & 18991.7 & \underline{28883.3} \\
+Ms Pacman           &    307.3 &   6951.6 &   1480.0 &   1465.5 &    960.5 &  1313.2 & 1265.6 & 1281.2 & 1327 & \underline{2008.3} & \textbf{2251.0} \\
+Pong                &    -20.7 &     14.6 &     12.8 &     -16.5 &     -8.5 &    -5.9 & -6.7 & \underline{20.1} & 18 & 16.7 & \textbf{20.8} \\
+Private Eye         &     24.9 &  69571.3 &     58.3 &   \underline{218.4} &    -13.6 &   124.0 & 56.3 & 96.7 & \textbf{882} & 40.5 & 99.8 \\
+Qbert               &    163.9 &  13455.0 &   1288.8 &   1042.4 &    854.4 &   669.1 & 3952.0 & \underline{13781.9} & 3405 & 4447.1 & \textbf{16058.3} \\
+Road Runner         &     11.5 &   7845.0 &   5640.6 &  5661.0 &   8895.1 & 14220.5 & 2500.0 & 17751.3 & 15565 & \textbf{33426.8} & \underline{27516.7} \\
+Seaquest            &     68.4 &  42054.7 &    683.3 &   384.5 &    301.2 &   583.1 & 208.0 & 1100.2 & 618 & \underline{1232.5} & \textbf{1974.0} \\
+Up N Down           &    533.4 &  11693.2 &   3350.3 &  2955.2 &   3180.8 & \textbf{28138.5} & 2896.9 & \underline{17264.2} & - & 12101.7 & 15224.3 \\
+\midrule
+Normed Mean         &    0.000 &    1.000 &    0.443 &    0.381 &    0.357 &   0.704 & 0.562 & 1.945 & 1.120 & \underline{2.247} & \textbf{2.428} \\
+Normed Median       &    0.000 &    1.000 &    0.144 &    0.175 &    0.268 &   0.415 & 0.227 & \underline{1.090} & 0.490 & 0.917 & \textbf{1.286} \\
+%Mean DQN@50M-Norm'd     &    0.000 &   23.382 &    0.232 &    0.239 &     0.197 &    0.325 &    0.171 &    0.336 &        \textbf{0.510} \\
+%Median DQN@50M-Norm'd  &    0.000 &    0.994 &    0.118 &    0.142 &     0.103 &    0.142 &    0.131 &    0.225 &        \textbf{0.361} \\ \midrule
+%\# Superhuman        &        0 &       N/A &        2 &        2 &         1 &        2 &        2 &        5 &            \textbf{7} \\
+\bottomrule
+%\vskip -0.5cm
+\end{tabular}
+}
+\end{small}
+\end{center}
+\end{table*}

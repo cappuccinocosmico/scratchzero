@@ -1,0 +1,66 @@
+\section{Related work}
+
+\subsection{Sample Efficient RL}
+
+Sample efficiency in RL algorithms remains an essential direction for research. Inspired by advances in self-supervised learning, many RL algorithms now employ this approach to enhance the learning of representations from image inputs. 
+For instance, CURL \citep{laskin2020curl} employs contrastive learning on hidden states to augment the efficacy of fundamental RL algorithms in image-based tasks. Similarly, SPR \citep{schwarzer2020data} innovates with a temporal consistency loss combined with data augmentations, resulting in enhanced performance.
+
+Furthermore, Model-Based Reinforcement Learning (MBRL) has demonstrated high sample efficiency and notable performance in both discrete and continuous control domains.
+SimPLE \citep{kaiser2019model}, by modeling the environment, predicts future trajectories, thereby achieving commendable performance in Atari games with limited data.
+TD-MPC \citep{hansen2022temporal} utilizes data-driven Model Predictive Control (MPC) \citep{rubinstein1997optimization} with a latent dynamics model and a terminal value function, optimizing trajectories through short-term planning and estimating long-term returns. The subsequent work, TD-MPC2 \citep{Anonymous2023TDMPC2}, excels in multi-task environments. 
+The TD-MPC series employs MPC to generate imagined latent states for action planning. In contrast, our method employs a more efficient action planning module called Sampling-based Gumbel Search, leading to lower computational costs.
+% In contrast, the TD-MPC series employs MPC to generate imagined latent states for action planning that are 200 times larger than those used in our method, leading to increased computational costs.
+% Other works incorporate uncertainty as an intrinsic reward to enhance efficiency \citep{wang2023coplanner} and leverage latent temporal consistency to concurrently learn a state encoder and a latent dynamics model \citep{zhao2023simplified}. 
+Dreamer \citep{hafner2019dream}, a reinforcement learning agent, develops behaviors from predictions within a compact latent space of a world model. Its latest iteration, Dreamer V3 \citep{hafner2023mastering}, is a general algorithm that leverages world models and surpasses previous methods across a wide range of domains. It showcases its sample efficiency by learning online and directly in real-world settings \citep{daydreamer}. 
+% The differences between DreamerV3 and our method are twofold. First, DreamerV3 employs a reconstruction loss with respect to raw images. However, this reconstruction loss includes unnecessary information from the raw images. These unnecessary information commonly does not contribute to decision-making. Secondly, without the action planning module, DreamerV3 shows inferior performance on the Atari 100k and Vision Control benchmarks.
+Although long-horizon planning in Dreamer V3 \citep{hafner2023mastering} enhances the quality of the collected data, an imagination horizon of $H=15$ may be excessively long, potentially leading to an accumulation of model errors.
+
+
+% Furthermore, Model-Based Reinforcement Learning (MBRL) has shown high sample efficiency and impressive performance in discrete and continuous control.
+% By learning an environment model, SimPLE \citep{kaiser2019model} rollouts the imagined trajectories to achieve the first strong performance on Atari games with as little as 100k data.
+% TD-MPC \citep{hansen2022temporal} employs data-driven Model Predictive Control (MPC) \citep{rubinstein1997optimization} with a latent dynamics model and a terminal value function to optimize trajectories using short-term planning and to estimate long-term returns. The recent work TD-MPC2 \citep{Anonymous2023TDMPC2} excels in multi-task settings. Compared with our method, TD-MPC series work applies MPC to create imagined latent states that are 200 times larger for action planning, which increases computational cost.
+% % Other works incorporate uncertainty as an intrinsic reward to improve efficiency \citep{wang2023coplanner} and use latent temporal consistency to jointly learn a state encoder and a latent dynamics model \citep{zhao2023simplified}. 
+% Dreamer \citep{hafner2019dream} is a reinforcement learning agent that develops behaviors based on predictions within a compact latent space of a world model. Its current version, Dreamer V3 \citep{hafner2023mastering}, is a general and scalable algorithm based on world models and outperforms previous approaches across a wide range of domains. It demonstrates its sample efficiency by learning online and directly in the real world \citep{daydreamer}. 
+% Although long-horizon planning in Dreamer V3 \citep{hafner2023mastering} improves the quality of collected data, the imagination horizon $H=15$ is too long to control the model compounding error.
+
+% Building on the Dreamer framework, some researchers have considered memories from predicted experiences in the world model to enhance policy learning \citep{mu2021model}. Another work trains an autoencoder with convolutional layers and vision transformers (ViT) to reconstruct pixels from masked convolutional features \citep{seo2023masked}. 
+
+\subsection{MCTS-based Work} 
+
+% \ywr{Muzero-series work seems a little narrow. MCTS-based RL?}
+AlphaGo \citep{silver2016mastering} is the first algorithm to defeat a professional human player in the game of Go, utilizing Monte-Carlo Tree Search (MCTS) \citep{coulom2006efficient} along with deep neural networks. 
+AlphaZero \citep{silver2017masteringchess} extends this approach to additional board games such as Chess and Shogi. 
+MuZero \citep{schrittwieser2020mastering}, aspiring to master complex games without prior knowledge of their rules, learns to predict game dynamics by training an environment model.
+Building upon MuZero, EfficientZero \cite{ye2021mastering} achieves superhuman performance in Atari games with only two hours of real-time gameplay, attributed to the self-supervision of the environment model. 
+However, applying MuZero to tasks with large action spaces significantly increases the computational cost of MCTS due to the growing number of simulations. Gumbel MuZero \citep{danihelka2021policy} effectively diminishes the complexity of search within vast action spaces by implementing Gumbel search, although it does not extend to continuous action domains. Sample MuZero \cite{hubert2021learning} proposes a sampling-based MCTS that contemplates subsets of sampled actions, thus adapting the MuZero framework for continuous control. Recent developments have also seen MuZero applied in stochastic environments \citep{antonoglou2021planning} and its value learning augmented by path consistency (PC) optimality regularization \citep{zhao2022efficient}. 
+Our method notably enhances Gumbel search for continuous control and requires only half the number of search simulations compared to Sample MuZero \citep{hubert2021learning}.
+
+% AlphaGo \citep{silver2016mastering} is the first algorithm to defeat a professional human player in the game of Go, using Monte-Carlo Tree Search (MCTS) \citep{coulom2006efficient} and deep neural networks.
+% AlphaZero \citep{silver2017masteringchess} generalizes the approach to more board games like Chess and Shogi. 
+% To master complex games without prior knowledge of their rules, MuZero \citep{schrittwieser2020mastering} learns to predict the game dynamics by training an environment model.
+% Based on MuZero, EfficientZero \cite{ye2021mastering} achieves super-human performance on Atari games with only two hours of real-time gameplay thanks to the self-supervision of the environment model. 
+% However, applying MuZero to tasks with large action spaces significantly increases the computational cost of MCTS due to the growing number of simulations. Gumbel MuZero \citep{danihelka2021policy} effectively reduces the complexity of search in large action spaces using Gumbel search, though it does not address continuous settings. Sample MuZero \cite{hubert2021learning} introduces a sampling-based MCTS that plans over subsets of sampled actions, adapting the MuZero framework for continuous control. Additionally, recent studies have explored the application of MuZero to stochastic environments \citep{antonoglou2021planning} and have enhanced value learning, regularized by path consistency (PC) optimality \citep{zhao2022efficient}. 
+% In summary, our method modifies the Gumbel search to support continuous control, and requires only half the number of search simulations compared to Sample MuZero \cite{hubert2021learning}.
+
+% It learns a discrete-action latent dynamics model from interactions with the environment and selects actions via lookahead MCTS within the model's latent space. 
+% In summary, our method surpasses other MuZero-series works in efficiency with limited data across various domains.
+
+% MuZero \citep{schrittwieser2020mastering} is a model-based policy learning algorithm based on Monte-Carlo Tree Search (MCTS) \citep{coulom2006efficient}, enabling it to master complex games like chess, shogi, and Go, as well as Atari games, without prior knowledge of their rules. 
+% EfficientZero \cite{ye2021mastering} has achieved super-human performance on Atari games with only two hours of real-time gameplay. It learns a discrete-action latent dynamics model from environment interactions and selects actions via lookahead MCTS in the latent space of the model. When it comes to applying MuZero to tasks with a large action space, the increasing number of simulations poses a huge computation cost on MCTS. Gumbel MuZero \citep{danihelka2021policy} utilizes the Gumbel search to decrease the complexity of search in a large action space dramatically, but does not extend to the continuous setting. Sample MuZero \cite{hubert2021learning} proposes a sampling-based MCTS to plan over small subsets of sampled actions, making the MuZero framework perform the continuous control. 
+% Furthermore, previous works study its application to stochastic environments \citep{antonoglou2021planning}, and enhance the value learning regularised by a path consistency (PC) optimality \citep{zhao2022efficient}. 
+% In summary, our method outperforms other MuZero-series work in terms of efficiency with limited data and across various domains. 
+
+% Additionally, our method requires only half the number of simulations compared to the EfficientZero V1\citep{ye2021mastering} and Sampled MuZero\citep{hubert2021learning}, benefiting from the Gumbel search.
+
+
+% In this section, we describe the differences between previous works, such as DreamerV3 \citep{hafner2023mastering}, TD-MPC2 \citep{Anonymous2023TDMPC2}, and Muzero-series work \cite{ye2021mastering, danihelka2021policy,hubert2021learning}.
+
+
+% DreamerV3 and TD-MPC2 train the agent using actor-critic learning together with a learned model.
+% Although long-horizon planning improves the quality of collected data in DreamerV3 \citep{hafner2023mastering}, the imagination horizon $H=15$ is too long to control the model compounding error.  
+% TD-MPC2 \citep{Anonymous2023TDMPC2} uses shorter horizon of 3 to implement planning. But Model Predictive Control in their method creates 100 times larger imagined trajectories to choose actions than our tree search approach. 
+
+% EfficientZero \citep{ye2021mastering}, Gumbel Muzero \citep{danihelka2021policy}, and Sample Muzero \citep{hubert2021learning} all apply the tree search method to find promising actions and improve policy.
+% The original MCTS in EfficientZero was only applied to domains with relatively small action spaces. Gumbel Muzero replaces MCTS with Gumbel search to achieve reduced simulations and policy improvement guarantees, but does not extend to the continuous setting.
+% Although Sample Muzero \cite{hubert2021learning} designs a sampling-based MCTS, which is capable for resolving continuous control, it still requires intensive simulations and is inferior in sample efficiency.
+% In summary, our method achieves superior performance with limited data and across domains than other Muzero-series work. Besides, the method uses 2 times fewer simulations than the original MCTS benefit from the Gumbel search. 
