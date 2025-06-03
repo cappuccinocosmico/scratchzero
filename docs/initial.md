@@ -79,7 +79,7 @@ $$
 = W_{\,k}^{T} \; \frac{\partial L}{\partial Z_{\,k}}.
 $$
 
-Since for a hidden layer \(k\), we have \(\delta_k = \partial L/\partial Z_k\), we use
+Since for a hidden layer $k$, we have $\delta_k = \partial L/\partial Z_k$, we use
 
 $$
 \frac{\partial L}{\partial V_{\,k-1}} 
@@ -114,11 +114,13 @@ $$
 By the chain rule,
 
 $$
+\begin{aligned}
 \left(\frac{\partial L}{\partial Z_k}\right)_j 
 = \sum_{r,s} \left(\frac{\partial L}{\partial W_k}\right)_{r,s}
 \frac{\partial (W_{k,r,s})}{\partial (W_{k,j,i})}
 \frac{\partial (Z_k)_j}{\partial (W_{k,j,i})}
 = \left(\frac{\partial L}{\partial W_k}\right)_{j,i} \,(V_{\,k-1})_{i}.
+\end{aligned}
 $$
 
 Therefore,
