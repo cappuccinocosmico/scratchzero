@@ -1,5 +1,4 @@
-use crate::mnist::tensor::Tensor;
-use crate::mnist::optim::Optimizer;
+use super::types::Tensor;
 
 /// Stochastic Gradient Descent optimizer.
 pub struct SGD {
@@ -21,4 +20,9 @@ impl Optimizer for SGD {
             }
         }
     }
+}
+
+pub trait Optimizer {
+    /// Update parameters given slices of parameters and corresponding gradients.
+    fn step(&mut self, params: &mut [&mut Tensor], grads: &[&Tensor]);
 }

@@ -1,13 +1,13 @@
-use crate::mnist::tensor::Tensor;
 use crate::mnist::module::Module;
-use crate::mnist::optim::Optimizer;
+use crate::mnist::tensor::Tensor;
+use crate::mnist::types::Optimizer;
 
 /// Fully connected layer.
 pub struct Dense {
     pub in_features: usize,
     pub out_features: usize,
-    pub weight: Tensor,    // [out, in]
-    pub bias: Tensor,      // [out]
+    pub weight: Tensor, // [out, in]
+    pub bias: Tensor,   // [out]
     pub grad_weight: Tensor,
     pub grad_bias: Tensor,
     input_cache: Option<Tensor>,
@@ -30,9 +30,9 @@ impl Dense {
 }
 
 impl Module for Dense {
-    fn forward(&mut self, input: &Tensor) -> Tensor {
+    fn forward(&self, input: &Tensor) -> Tensor {
         // input: [batch, in_features]
-        self.input_cache = Some(input.clone());
+        // self.input_cache = Some(input.clone());
         // TODO: implement actual matmul + bias
         let batch = input.shape[0];
         Tensor::zeros(&[batch, self.out_features])

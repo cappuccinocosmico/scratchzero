@@ -11,13 +11,19 @@ impl Tensor {
     /// Creates a new tensor with given shape, filled with zeros.
     pub fn zeros(shape: &[usize]) -> Self {
         let size = shape.iter().product();
-        Tensor { data: vec![0.0; size], shape: shape.to_vec() }
+        Tensor {
+            data: vec![0.0; size],
+            shape: shape.to_vec(),
+        }
     }
 
     /// Creates a new tensor from data and shape.
     pub fn from_vec(data: Vec<f32>, shape: &[usize]) -> Self {
         assert_eq!(data.len(), shape.iter().product());
-        Tensor { data, shape: shape.to_vec() }
+        Tensor {
+            data,
+            shape: shape.to_vec(),
+        }
     }
 
     /// Returns the total number of elements.

@@ -1,2 +1,2 @@
-pub mod sequential;
 pub mod loss;
+pub mod sequential;

@@ -1,6 +1,6 @@
 use crate::mnist::module::Module;
-use crate::mnist::optim::Optimizer;
 use crate::mnist::tensor::Tensor;
+use crate::mnist::types::Optimizer;
 
 /// Container to apply layers sequentially.
 pub struct Sequential {
@@ -14,9 +14,9 @@ impl Sequential {
 }
 
 impl Module for Sequential {
-    fn forward(&mut self, input: &Tensor) -> Tensor {
-        let mut x = input.clone();
-        for layer in self.layers.iter_mut() {
+    fn forward(&self, input: &Tensor) -> Tensor {
+        let mut x = Tensor::zeros(&input.shape);
+        for layer in &self.layers {
             x = layer.forward(&x);
         }
         x
