@@ -3,17 +3,17 @@ use crate::mnist::tensor::Tensor;
 use crate::mnist::types::Optimizer;
 
 /// Container to apply layers sequentially.
-pub struct Sequential {
+pub struct SequentialNN {
     pub layers: Vec<Box<dyn Module>>,
 }
 
-impl Sequential {
+impl SequentialNN {
     pub fn new(layers: Vec<Box<dyn Module>>) -> Self {
-        Sequential { layers }
+        SequentialNN { layers }
     }
 }
 
-impl Module for Sequential {
+impl Module for SequentialNN {
     fn forward(&self, input: &Tensor) -> Tensor {
         let mut x = Tensor::zeros(&input.shape);
         for layer in &self.layers {
