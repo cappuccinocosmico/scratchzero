@@ -1,130 +1,125 @@
 use smallvec::{SmallVec, ToSmallVec};
 
 const MAX_TENSOR_DIMENSION: usize = 5;
+type DimSizeType = usize;
+type flt = f32;
 
-/// N-dimensional tensor of `f32`.
-pub struct TensorRef {
+pub struct Tensor<const dim: usize> {
     /// Shape, e.g., [batch, channels, height, width].
-    pub shape: SmallVec<[usize; MAX_TENSOR_DIMENSION]>,
+    pub shape: [DimSizeType; dim],
     /// Flattened data in row-major order.
-    pub data: [f32],
-}
-
-pub struct OwnedTensor {
-    /// Shape, e.g., [batch, channels, height, width].
-    pub shape: SmallVec<[usize; MAX_TENSOR_DIMENSION]>,
-    /// Flattened data in row-major order.
-    data: Vec<f32>,
+    data: Vec<flt>,
 }
 
 #[derive(Clone, Copy, Debug)]
 pub struct WrongDimensionError;
+impl<const dim: usize> Tensor<dim> {
+    pub fn tnsr_prod<const odim: DimSizeType>(
+        &self,
+        other: &Tensor<odim>,
+    ) -> Tensor<{ dim + odim }> {
+        // Calculate new shape by concatenating dimensions
+        let mut new_shape = [0; dim + odim];
+        new_shape[..dim].copy_from_slice(&self.shape);
+        new_shape[dim..].copy_from_slice(&other.shape);
 
-impl OwnedTensor {
+        // Compute outer product values
+        let mut data = Vec::with_capacity(self.data.len() * other.data.len());
+        for &a in &self.data {
+            for &b in &other.data {
+                data.push(a * b);
+            }
+        }
+
+        Tensor::from_vec_unchecked(data, new_shape)
+    }
     /// Creates a new tensor with given shape, filled with zeros.
-    pub fn zeros(shape: &[usize]) -> Self {
+    pub fn zeros(shape: [usize; dim]) -> Self {
         let size = shape.iter().product();
-        OwnedTensor {
+        Tensor {
             data: vec![0.0; size],
-            shape: shape.to_smallvec(),
+            shape,
         }
     }
 
     /// Creates a new tensor from data and shape.
-    pub fn from_vec(data: Vec<f32>, shape: &[usize]) -> Self {
-        assert_eq!(data.len(), shape.iter().product());
-        OwnedTensor {
-            data,
-            shape: shape.to_smallvec(),
+    pub fn from_vec(
+        data: Vec<flt>,
+        shape: [DimSizeType; dim],
+    ) -> Result<Self, WrongDimensionError> {
+        if data.len() != shape.iter().product() {
+            return Err(WrongDimensionError);
         }
+        Ok(Self::from_vec_unchecked(data, shape))
     }
-}
-
-impl TensorRef {
-    // Could you create a function that takes in a reference to some data, and a &shape, that outputs a reference to a &Tensor, which has the data and shape.
-    pub fn new_from_references<'a>(data: &'a [f32], shape: &[usize]) -> &Self {}
+    pub fn from_vec_unchecked(data: Vec<flt>, shape: [usize; dim]) -> Self {
+        Tensor { data, shape }
+    }
 
     /// Returns the total number of elements.
     pub fn len(&self) -> usize {
         self.data.len()
     }
 
-    pub fn add(&self, other: &TensorRef) -> Result<OwnedTensor, WrongDimensionError> {
+    pub fn add(&self, other: &Tensor<dim>) -> Result<Tensor<dim>, WrongDimensionError> {
         if self.shape != other.shape {
             return Err(WrongDimensionError);
         };
-        let mut result = OwnedTensor::zeros(&self.shape);
-        for index in 0..self.len() {
-            result.data[index] = self.data[index] + other.data[index]
-        }
-        Ok(result)
-    }
 
-    pub fn matmul(&self, other: &TensorRef) -> Result<OwnedTensor, WrongDimensionError> {
-        // Check dimensionality (max 2D)
-        if self.shape.len() > 2 || other.shape.len() > 2 {
+        let mut data = Vec::with_capacity(self.data.len());
+        for index in 0..self.len() {
+            data.push(self.data[index] + other.data[index])
+        }
+        Ok(Self::from_vec_unchecked(data, self.shape))
+    }
+}
+impl Tensor<2> {
+    pub fn matmul(&self, other: &Tensor<2>) -> Result<Tensor<2>, WrongDimensionError> {
+        if self.shape[1] != other.shape[0] {
             return Err(WrongDimensionError);
         }
+        let m = self.shape[0];
+        let n = self.shape[1];
+        let p = other.shape[1];
+        let mut result_data = vec![0.0; m * p];
 
-        match (self.shape.len(), other.shape.len()) {
-            // Matrix multiplication (MxN * NxP -> MxP)
-            (2, 2) => {
-                if self.shape[1] != other.shape[0] {
-                    return Err(WrongDimensionError);
+        for i in 0..m {
+            for j in 0..p {
+                let mut sum = 0.0;
+                for k in 0..n {
+                    sum += self.data[i * n + k] * other.data[k * p + j];
                 }
-                let m = self.shape[0];
-                let n = self.shape[1];
-                let p = other.shape[1];
-                let mut result_data = vec![0.0; m * p];
-
-                for i in 0..m {
-                    for j in 0..p {
-                        let mut sum = 0.0;
-                        for k in 0..n {
-                            sum += self.data[i * n + k] * other.data[k * p + j];
-                        }
-                        result_data[i * p + j] = sum;
-                    }
-                }
-                Ok(OwnedTensor::from_vec(result_data, &[m, p]))
+                result_data[i * p + j] = sum;
             }
-
-            // Matrix * Vector (MxN * N -> M)
-            (2, 1) => {
-                if self.shape[1] != other.shape[0] {
-                    return Err(WrongDimensionError);
-                }
-                let m = self.shape[0];
-                let n = self.shape[1];
-                let mut result_data = vec![0.0; m];
-
-                for i in 0..m {
-                    for k in 0..n {
-                        result_data[i] += self.data[i * n + k] * other.data[k];
-                    }
-                }
-                Ok(OwnedTensor::from_vec(result_data, &[m]))
-            }
-
-            // Vector * Matrix (1xN * NxP -> 1xP treated as P)
-            (1, 2) => {
-                if self.shape[0] != other.shape[0] {
-                    return Err(WrongDimensionError);
-                }
-                let n = self.shape[0];
-                let p = other.shape[1];
-                let mut result_data = vec![0.0; p];
-
-                for j in 0..p {
-                    for k in 0..n {
-                        result_data[j] += self.data[k] * other.data[k * p + j];
-                    }
-                }
-                Ok(OwnedTensor::from_vec(result_data, &[p]))
-            }
-
-            // Invalid combination
-            _ => Err(WrongDimensionError),
         }
+        Ok(Tensor::<2>::from_vec(result_data, [m, p]).unwrap())
+    }
+    pub fn vecmul(&self, other: &Tensor<1>) -> Result<Tensor<1>, WrongDimensionError> {
+        if self.shape[1] != other.shape[0] {
+            return Err(WrongDimensionError);
+        }
+        let m = self.shape[0];
+        let n = self.shape[1];
+        let mut result_data = vec![0.0; m];
+
+        for i in 0..m {
+            for k in 0..n {
+                result_data[i] += self.data[i * n + k] * other.data[k];
+            }
+        }
+        Ok(Tensor::<1>::from_vec_unchecked(result_data, [m]))
+    }
+}
+
+impl Tensor<1> {
+    pub fn dot(&self, other: &Tensor<1>) -> Result<flt, WrongDimensionError> {
+        if self.shape[0] != other.shape[0] {
+            return Err(WrongDimensionError);
+        };
+        let mut collector = 0.0;
+        for i in 0..self.shape[0] {
+            collector += self.data[i] * other.data[i]
+        }
+        Ok(collector)
     }
 }
