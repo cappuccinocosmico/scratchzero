@@ -82,7 +82,7 @@ impl Tensor<2> {
         let n = self.shape[1];
         let p = other.shape[1];
         let mut result_data = vec![0.0; m * p];
-
+        // TODO: Implement the faster strassen matmul algorithm
         for i in 0..m {
             for j in 0..p {
                 let mut sum = 0.0;

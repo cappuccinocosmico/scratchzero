@@ -11,18 +11,8 @@ impl SGD {
     }
 }
 
-impl Optimizer for SGD {
-    fn step(&mut self, params: &mut [&mut Tensor], grads: &[&Tensor]) {
-        for (param, grad) in params.iter_mut().zip(grads.iter()) {
-            let p = &mut *param;
-            for (pv, gv) in p.data.iter_mut().zip(grad.data.iter()) {
-                *pv -= self.lr * gv;
-            }
-        }
-    }
-}
-
 pub trait Optimizer {
     /// Update parameters given slices of parameters and corresponding gradients.
-    fn step(&mut self, params: &mut [&mut Tensor], grads: &[&Tensor]);
+    fn step<const dim: usize>(&mut self, params: &mut [&mut Tensor<dim>], grads: &[&Tensor<dim>]);
 }
+impl Optimizer for SGD {}
