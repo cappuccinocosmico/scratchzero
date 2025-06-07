@@ -211,51 +211,6 @@ pub trait Optimizer {
 
 And concrete impls like SGD, Adam, etc.
 
----
-
-# 6. Data Loading & Training Loop
-
-- **`src/data/mnist.rs`**: load images into `Tensor<4>` batches.
-- **`src/train.rs`**:
-  1. instantiate your `Model` (a `Sequential`)
-  2. loop over epochs + batches
-     - zero all grads
-     - `(logits, caches) = model.forward(batch)`
-     - compute loss + `d_logits` via a standalone `cross_entropy_backward`
-     - `param_grads = model.backward(&d_logits, &caches)`
-     - `model.update(&param_grads, learning_rate)`
-
-- **`src/infer.rs`**: drop the backward/update steps and caches; just call `model.forward` and take `.0`.
-
----
-
-# 7. Directory Layout
-
-```
-scratchzero/
-├── Cargo.toml
-└── src
-    ├── tensor.rs
-    ├── field.rs
-    ├── module.rs
-    ├── models
-    │   └── sequential.rs
-    ├── layers
-    │   ├── linear.rs
-    │   ├── conv2d.rs
-    │   ├── relu.rs
-    │   ├── pool.rs
-    │   └── loss.rs
-    ├── optim
-    │   ├── sgd.rs
-    │   └── adam.rs
-    ├── data
-    │   └── mnist.rs
-    ├── train.rs
-    └── infer.rs
-```
-
----
 
 # 8. Why This Design?
 
