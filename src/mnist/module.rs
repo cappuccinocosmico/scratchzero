@@ -1,26 +1,36 @@
-/// Core trait for layers and models.
+use crate::mnist::field::Field;
+use crate::mnist::tensor::Tensor;
+
+/// Each layer or model that has (optional) parameters implements `Module`.
 pub trait Module {
-    type InternalData;
-    type CacheData;
-    type InputData;
-    type OutputData;
-    /// Forward pass with cache: input -> output, cache.
-    fn forward_with_cache(&self, input: &Self::InputData) -> (Self::OutputData, Self::CacheData);
-    /// Forward pass without cache.
-    fn forward(&self, input: &Self::InputData) -> Self::OutputData {
-        self.forward_with_cache(input).0
-    }
-    /// Backward pass: gradient of output -> gradient of input, gradient of layer weights
+    /// The type of input this module consumes.
+    type Input;
+    /// The type of output this module produces.
+    type Output;
+    /// The parameters of this module (pure values).
+    type Param;
+    /// The gradients of the parameters.
+    type ParamGrad;
+    /// Any cached activations needed for backward.
+    type Cache;
+
+    /// Pure forward: returns output and cache needed for backward.
+    fn forward(&self, input: &Self::Input) -> (Self::Output, Self::Cache);
+
+    /// Pure backward: given grad w.r.t. output + cache, returns
+    /// - grad w.r.t. input, and
+    /// - grad w.r.t. this module's parameters.
     fn backward(
         &self,
-        grad_output: &Self::OutputData,
-        cache: &Self::CacheData,
-    ) -> (Self::InputData, Self::InternalData);
-    /// Apply an offset to the weights.
-    fn apply_offset_to_weights(&mut self, offset: &Self::InternalData);
+        grad_output: &Self::Output,
+        cache: &Self::Cache,
+    ) -> (Self::Input, Self::ParamGrad);
+
+    /// Apply an optimizer update to the parameters, given parameter gradients and learning rate.
+    fn update(&mut self, param_grad: &Self::ParamGrad, lr: f32);
 }
 
-/// Stochastic Gradient Descent optimizer.
+/// Simple Stochastic Gradient Descent optimizer.
 pub struct SGD {
     pub lr: f32,
 }
@@ -30,20 +40,3 @@ impl SGD {
         SGD { lr }
     }
 }
-
-// Needs to work with more generic data schemas.
-pub trait Optimizer {
-    // Update parameters given slices of parameters and corresponding gradients.
-    // fn step(&mut self, params: &mut [&mut Tensor], grads: &[&Tensor]);
-}
-//
-// impl Optimizer for SGD {
-//     fn step(&mut self, params: &mut [&mut Tensor], grads: &[&Tensor]) {
-//         for (param, grad) in params.iter_mut().zip(grads.iter()) {
-//             let p = &mut *param;
-//             for (pv, gv) in p.data.iter_mut().zip(grad.data.iter()) {
-//                 *pv -= self.lr * gv;
-//             }
-//         }
-//     }
-// }

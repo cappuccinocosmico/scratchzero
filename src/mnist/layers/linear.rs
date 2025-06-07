@@ -1,0 +1,87 @@
+use crate::mnist::{tensor::Tensor, field::Field, module::Module};
+
+/// Linear (Fully Connected) Layer
+pub struct Linear {
+    pub w: Field<2>, // [out_features, in_features]
+    pub b: Field<1>, // [out_features]
+}
+
+/// Cache for Linear layer (stores input)
+pub struct LinearCache {
+    pub input: Tensor<2>,
+}
+
+impl Linear {
+    /// Create a new Linear layer with random initialization
+    pub fn new(in_features: usize, out_features: usize) -> Self {
+        let w = Tensor::<2>::zeros([out_features, in_features]);
+        let b = Tensor::<1>::zeros([out_features]);
+        Linear { w: Field::new(w), b: Field::new(b) }
+    }
+}
+
+impl Module for Linear {
+    type Input = Tensor<2>;
+    type Output = Tensor<2>;
+    type Param = (Tensor<2>, Tensor<1>);
+    type ParamGrad = (Tensor<2>, Tensor<1>);
+    type Cache = LinearCache;
+
+    fn forward(&self, input: &Self::Input) -> (Self::Output, Self::Cache) {
+        let batch = input.shape[0];
+        let in_features = input.shape[1];
+        let out_features = self.w.value.shape[0];
+        let mut out = Tensor::<2>::zeros([batch, out_features]);
+        // out[b, j] = sum_k input[b, k] * w[j, k] + b[j]
+        for b_idx in 0..batch {
+            for j in 0..out_features {
+                let mut sum = 0.0;
+                for k in 0..in_features {
+                    sum += input.data()[b_idx * in_features + k] * self.w.value.data()[j * in_features + k];
+                }
+                sum += self.b.value.data()[j];
+                out.data_mut()[b_idx * out_features + j] = sum;
+            }
+        }
+        (out.clone(), LinearCache { input: input.clone() })
+    }
+
+    fn backward(
+        &self,
+        grad_output: &Self::Output,
+        cache: &Self::Cache,
+    ) -> (Self::Input, Self::ParamGrad) {
+        let batch = grad_output.shape[0];
+        let in_features = cache.input.shape[1];
+        let out_features = grad_output.shape[1];
+        // dW shape [out_features, in_features]
+        let mut dW = Tensor::<2>::zeros([out_features, in_features]);
+        // dB shape [out_features]
+        let mut dB = Tensor::<1>::zeros([out_features]);
+        // dX shape [batch, in_features]
+        let mut dX = Tensor::<2>::zeros([batch, in_features]);
+
+        for b_idx in 0..batch {
+            for j in 0..out_features {
+                let go = grad_output.data()[b_idx * out_features + j];
+                dB.data_mut()[j] += go;
+                for k in 0..in_features {
+                    dW.data_mut()[j * in_features + k] += go * cache.input.data()[b_idx * in_features + k];
+                    dX.data_mut()[b_idx * in_features + k] += go * self.w.value.data()[j * in_features + k];
+                }
+            }
+        }
+        (dX, (dW, dB))
+    }
+
+    fn update(&mut self, param_grad: &Self::ParamGrad, lr: f32) {
+        let (ref dW, ref dB) = *param_grad;
+        // SGD update
+        for (w_val, dw) in self.w.value.data_mut().iter_mut().zip(dW.data().iter()) {
+            *w_val -= lr * dw;
+        }
+        for (b_val, db) in self.b.value.data_mut().iter_mut().zip(dB.data().iter()) {
+            *b_val -= lr * db;
+        }
+    }
+}

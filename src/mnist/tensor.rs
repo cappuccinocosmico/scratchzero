@@ -14,6 +14,17 @@ pub struct Tensor<const dim: usize> {
 #[derive(Clone, Copy, Debug)]
 pub struct WrongDimensionError;
 impl<const dim: usize> Tensor<dim> {
+    /// Mutable access to underlying data.
+    pub fn data_mut(&mut self) -> &mut [flt] {
+        &mut self.data
+    }
+
+    /// Immutable access to underlying data.
+    pub fn data(&self) -> &[flt] {
+        &self.data
+    }
+
+    
     pub fn tnsr_prod<const odim: DimSizeType>(
         &self,
         other: &Tensor<odim>,
