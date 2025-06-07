@@ -1,18 +1,23 @@
 /// Core trait for layers and models.
 pub trait Module {
-    type InternalCache;
+    type InternalData;
+    type CacheData;
     type InputData;
     type OutputData;
-    /// Forward pass: input -> output.
-    fn forward(&self, input: &Self::InputData) -> (Self::OutputData, Self::InternalCache);
-    /// Backward pass: gradient of output -> gradient of input.
+    /// Forward pass with cache: input -> output, cache.
+    fn forward_with_cache(&self, input: &Self::InputData) -> (Self::OutputData, Self::CacheData);
+    /// Forward pass without cache.
+    fn forward(&self, input: &Self::InputData) -> Self::OutputData {
+        self.forward_with_cache(input).0
+    }
+    /// Backward pass: gradient of output -> gradient of input, gradient of layer weights
     fn backward(
         &self,
         grad_output: &Self::OutputData,
-        internal_cache: &Self::InternalCache,
-    ) -> Self::InputData;
-    /// Update parameters using optimizer.
-    fn update(&mut self, optimizer: &mut dyn Optimizer);
+        cache: &Self::CacheData,
+    ) -> (Self::InputData, Self::InternalData);
+    /// Apply an offset to the weights.
+    fn apply_offset_to_weights(&mut self, offset: &Self::InternalData);
 }
 
 /// Stochastic Gradient Descent optimizer.

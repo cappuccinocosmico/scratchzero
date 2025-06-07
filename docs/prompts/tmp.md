@@ -68,7 +68,52 @@ impl Module for Sequential {
 ```
 
 
+However there seem to be a couple problems with these types. Namely for tensors after actually writing the code it makes sense to embed the dimensionality of a tensor in the code as a generic constant like so:
+```rs
 
-Once done write all your thoughts to 
+type DimSizeType = usize;
+type flt = f32;
 
-/home/nicole/Documents/mycorrhizae/scratchzero/docs/prompts/initial_architecture.md
+pub struct Tensor<const dim: usize> {
+    /// Shape, e.g., [batch, channels, height, width].
+    pub shape: [DimSizeType; dim],
+    /// Flattened data in row-major order.
+    data: Vec<flt>,
+}
+```
+
+I also went ahead and implemented by hand all of the matrix multiplication and other tools. You can find it all in:
+/home/nicole/Documents/mycorrhizae/scratchzero/src/mnist/tensor.rs
+
+As for modules, I am still thinking a bit about what to do. Mainly, even though it might be possible to store the cache results internally, that would totally interfere with the ability to do batch processing and apply the weights all at once, and also make it impossible to use the model for inference across multiple threads, and also kind of goes against rust's functional programming ethos. However I dont necessarially know how to implement this. Here was one of my attempts:
+
+```rust
+/// Core trait for layers and models.
+pub trait Module {
+    type InternalData;
+    type CacheData;
+    type InputData;
+    type OutputData;
+    /// Forward pass with cache: input -> output, cache.
+    fn forward_with_cache(&self, input: &Self::InputData) -> (Self::OutputData, Self::CacheData);
+    /// Forward pass without cache.
+    fn forward(&self, input: &Self::InputData) -> Self::OutputData {
+        self.forward_with_cache(input).0
+    }
+    /// Backward pass: gradient of output -> gradient of input, gradient of layer weights
+    fn backward(
+        &self,
+        grad_output: &Self::OutputData,
+        cache: &Self::CacheData,
+    ) -> (Self::InputData, Self::InternalData);
+    /// Apply an offset to the weights.
+    fn apply_offset_to_weights(&mut self, offset: &Self::InternalData);
+}
+```
+
+However this would still present some problems. Namely there is some inefficences because it still needs to cache results for ReLU layers that dont need any backpropogation. 
+
+There also needs to be some kind of trait for the internal data that would let you aggregate multiple elements together to apply results from a batch process. But all it should need is an ability to add together the types, and do scalar multiplication for stochastic gradient descent.
+
+
+And I also have a suspicion that there might be a way to implement this more simply while retaining all the functionality thoughts?
