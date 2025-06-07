@@ -29,14 +29,3 @@ pub trait Module {
     /// Apply an optimizer update to the parameters, given parameter gradients and learning rate.
     fn update(&mut self, param_grad: &Self::ParamGrad, lr: f32);
 }
-
-/// Simple Stochastic Gradient Descent optimizer.
-pub struct SGD {
-    pub lr: f32,
-}
-
-impl SGD {
-    pub fn new(lr: f32) -> Self {
-        SGD { lr }
-    }
-}

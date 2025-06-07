@@ -1,4 +1,4 @@
-use crate::mnist::{tensor::Tensor, module::Module};
+use crate::mnist::{module::Module, tensor::Tensor};
 
 /// ReLU activation layer.
 pub struct ReLU<const D: usize>;
@@ -16,8 +16,8 @@ pub struct ReLUCache<const D: usize> {
 impl<const D: usize> Module for ReLU<D> {
     type Input = Tensor<D>;
     type Output = Tensor<D>;
-    type Param = ();  // no parameters
-    type ParamGrad = ();  // no gradients
+    type Param = (); // no parameters
+    type ParamGrad = (); // no gradients
     type Cache = ReLUCache<D>;
 
     fn forward(&self, input: &Self::Input) -> (Self::Output, Self::Cache) {
@@ -27,7 +27,12 @@ impl<const D: usize> Module for ReLU<D> {
                 *v = 0.0;
             }
         }
-        (output.clone(), ReLUCache { input: input.clone() })
+        (
+            output.clone(),
+            ReLUCache {
+                input: input.clone(),
+            },
+        )
     }
 
     fn backward(

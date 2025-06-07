@@ -1,4 +1,4 @@
-use crate::mnist::{tensor::Tensor, field::Field, module::Module};
+use crate::mnist::{field::Field, module::Module, tensor::Tensor};
 
 /// Linear (Fully Connected) Layer
 pub struct Linear {
@@ -16,7 +16,10 @@ impl Linear {
     pub fn new(in_features: usize, out_features: usize) -> Self {
         let w = Tensor::<2>::zeros([out_features, in_features]);
         let b = Tensor::<1>::zeros([out_features]);
-        Linear { w: Field::new(w), b: Field::new(b) }
+        Linear {
+            w: Field::new(w),
+            b: Field::new(b),
+        }
     }
 }
 
@@ -37,13 +40,19 @@ impl Module for Linear {
             for j in 0..out_features {
                 let mut sum = 0.0;
                 for k in 0..in_features {
-                    sum += input.data()[b_idx * in_features + k] * self.w.value.data()[j * in_features + k];
+                    sum += input.data()[b_idx * in_features + k]
+                        * self.w.value.data()[j * in_features + k];
                 }
                 sum += self.b.value.data()[j];
                 out.data_mut()[b_idx * out_features + j] = sum;
             }
         }
-        (out.clone(), LinearCache { input: input.clone() })
+        (
+            out.clone(),
+            LinearCache {
+                input: input.clone(),
+            },
+        )
     }
 
     fn backward(
@@ -66,8 +75,10 @@ impl Module for Linear {
                 let go = grad_output.data()[b_idx * out_features + j];
                 dB.data_mut()[j] += go;
                 for k in 0..in_features {
-                    dW.data_mut()[j * in_features + k] += go * cache.input.data()[b_idx * in_features + k];
-                    dX.data_mut()[b_idx * in_features + k] += go * self.w.value.data()[j * in_features + k];
+                    dW.data_mut()[j * in_features + k] +=
+                        go * cache.input.data()[b_idx * in_features + k];
+                    dX.data_mut()[b_idx * in_features + k] +=
+                        go * self.w.value.data()[j * in_features + k];
                 }
             }
         }
@@ -85,3 +96,4 @@ impl Module for Linear {
         }
     }
 }
+

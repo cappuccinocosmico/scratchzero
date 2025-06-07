@@ -19,3 +19,4 @@ impl<const D: usize> Field<D> {
         self.grad.data_mut().iter_mut().for_each(|v| *v = 0.0);
     }
 }
+

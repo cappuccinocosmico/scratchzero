@@ -4,6 +4,7 @@ const MAX_TENSOR_DIMENSION: usize = 5;
 type DimSizeType = usize;
 type flt = f32;
 
+#[derive(Clone, Debug)]
 pub struct Tensor<const dim: usize> {
     /// Shape, e.g., [batch, channels, height, width].
     pub shape: [DimSizeType; dim],
@@ -24,7 +25,6 @@ impl<const dim: usize> Tensor<dim> {
         &self.data
     }
 
-    
     pub fn tnsr_prod<const odim: DimSizeType>(
         &self,
         other: &Tensor<odim>,
