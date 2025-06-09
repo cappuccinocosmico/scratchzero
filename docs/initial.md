@@ -6,9 +6,9 @@ This paper
 is a state of the art reinforcement learning architecture designed to do similar stuff to alphago but with way fewer samples. Its the main idea for 
 
 
-2. EVERYTHING MUST COME FROM SCRATH. No dependancies except for extreme basics, the following must be forbidden.  
-- No transformer or tensor libraries. ie candle or other stuff  
-- Dependancies for automatic differentiation.  Autograd baad.
+2. EVERYTHING MUST COME FROM SCRATCH. No dependencies except for extreme basics, the following must be forbidden.  
+- No transformer or tensor libraries. ie candle / burn or other stuff  
+- Dependencies for automatic differentiation.  Autograd baad.
 
 3. Rust for everything!! Largely just because of the type safety and ability to write very generic low level code.  
 
