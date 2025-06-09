@@ -9,12 +9,12 @@ use crate::mnist::{
     types::{Module, Tensor},
 };
 
-trait SequenceConfig {
+pub trait SequenceConfig {
     type Input;
     type Output;
 }
 
-struct Sequential<T: SequenceConfig> {
+pub struct Sequential<T: SequenceConfig> {
     config: T,
     layers: Vec<Box<dyn DynModule>>,
 }
@@ -53,9 +53,9 @@ impl<T: SequenceConfig + 'static> Module for Sequential<T> {
         let mut last_output: Box<dyn Any> = Box::new(());
 
         for layer in self.layers.iter() {
-            let forward_box = layer.forward_boxed(current_input);
-            caches.push(forward_box.cache);
-            last_output = forward_box.output;
+            let forward_boxes = layer.forward_boxed(current_input);
+            caches.push(forward_boxes.cache);
+            last_output = forward_boxes.output;
             current_input = last_output.as_ref();
         }
 
@@ -95,29 +95,12 @@ impl<T: SequenceConfig + 'static> Module for Sequential<T> {
 }
 
 #[derive(Default, Clone, Copy)]
-struct TestConfig {}
+pub struct TestConfig {}
 impl SequenceConfig for TestConfig {
     type Input = Tensor<1>;
     type Output = Tensor<1>;
 }
 
-// 1. type mismatch resolving `<ReLU<_> as ModConfig>::Input == dyn Any`
-//    expected trait object `(dyn std::any::Any + 'static)`
-//             found struct `mnist::tensor::Tensor<_>`
-//    `mnist::tensor::Tensor<_>` implements `Any` so you could box the found value and coerce it to the trait object `Box<dyn Any>`, you will have to change the expected type as well
-//    required for the cast from `std::boxed::Box<mnist::layers::relu::ReLU<_>>` to `Box<dyn Module<Cache = ..., Input = ..., Output = ..., Param = ...>>`
-//    the full name for the type has been written to '/home/nicole/Documents/mycorrhizae/scratchzero/target/debug/deps/scratchzero-c0bf52bb0a05b17c.long-type-15745142465020583203.txt'
-//    consider using `--verbose` to print the full type name to the console [E0271]
-fn make_test_sequential() -> Sequential<TestConfig> {
+pub fn make_test_sequential() -> Sequential<TestConfig> {
     Sequential::new(vec![dynify(ReLU::<1>)], TestConfig::default()).unwrap()
 }
-
-// I would like to go ahead and set this up so that it has some runtime reflection going on. Where
-// you can initialize it with any set of layers. When its initialized it will do a runtime check to
-// make sure all the types from layer to layer match. (As well as the input and output types on the
-// object directly). But other then this it should be completely general and able to change its own
-// shape an internals depending on what its doing. IS there a good way this could potetnially work?
-//
-// This rust code is at
-// /home/nicole/Documents/mycorrhizae/scratchzero/src/mnist/layers/sequential.rs
-// if you need to browse around the project

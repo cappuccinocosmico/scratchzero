@@ -1,4 +1,4 @@
-mod dyn_module;
-mod dyn_sequential;
-mod linear;
-mod relu;
+pub mod dyn_module;
+pub mod dyn_sequential;
+pub mod linear;
+pub mod relu;
