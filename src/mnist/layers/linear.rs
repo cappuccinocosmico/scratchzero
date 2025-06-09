@@ -6,54 +6,47 @@ use crate::mnist::{
 
 /// Linear (Fully Connected) Layer
 pub struct Linear {
-    pub w: Field<2>, // [out_features, in_features]
-    pub b: Field<1>, // [out_features]
+    pub w: Tensor<2>, // [out_features, in_features]
+    pub b: Tensor<1>, // [out_features]
 }
 
 /// Cache for Linear layer (stores input)
 pub struct LinearCache {
-    pub input: Tensor<2>,
+    pub input: Tensor<1>,
 }
 
 impl Linear {
     /// Create a new Linear layer with random initialization
     pub fn new(in_features: usize, out_features: usize) -> Self {
-        let w = Tensor::<2>::zeros([out_features, in_features]);
-        let b = Tensor::<1>::zeros([out_features]);
-        Linear {
-            w: Field::new(w),
-            b: Field::new(b),
-        }
+        let w = Tensor::<2>::random([out_features, in_features]);
+        let b = Tensor::<1>::random([out_features]);
+        Linear { w, b }
     }
 }
 
 impl ModConfig for Linear {
-    type Input = Tensor<2>;
-    type Output = Tensor<2>;
+    type Input = Tensor<1>;
+    type Output = Tensor<1>;
     type Param = (Tensor<2>, Tensor<1>);
     type Cache = LinearCache;
 }
 
 impl Module for Linear {
     fn forward(&self, input: &Self::Input) -> (Self::Output, Self::Cache) {
-        let batch = input.shape[0];
-        let in_features = input.shape[1];
-        let out_features = self.w.value.shape[0];
-        let mut out = Tensor::<2>::zeros([batch, out_features]);
+        let in_features = input.shape()[1];
+        let out_features = self.b.shape()[0];
+        let mut out = Tensor::<1>::zeros([out_features]);
         // out[b, j] = sum_k input[b, k] * w[j, k] + b[j]
-        for b_idx in 0..batch {
-            for j in 0..out_features {
-                let mut sum = 0.0;
-                for k in 0..in_features {
-                    sum += input.data()[b_idx * in_features + k]
-                        * self.w.value.data()[j * in_features + k];
-                }
-                sum += self.b.value.data()[j];
-                out.data_mut()[b_idx * out_features + j] = sum;
+        for j in 0..out_features {
+            let mut sum = 0.0;
+            for k in 0..in_features {
+                sum += input.data()[k] * self.w.data()[j * in_features + k];
             }
+            sum += self.b.data()[j];
+            out.data_mut()[j] = sum;
         }
         (
-            out.clone(),
+            out,
             LinearCache {
                 input: input.clone(),
             },
@@ -65,7 +58,26 @@ impl Module for Linear {
         grad_output: &Self::Output,
         cache: &Self::Cache,
     ) -> (Self::Input, Self::Param) {
-        let batch = grad_output.shape[0];
+        let in_features = input.shape()[1];
+        let out_features = self.b.shape()[0];
+        let mut out = Tensor::<1>::zeros([out_features]);
+        // out[b, j] = sum_k input[b, k] * w[j, k] + b[j]
+        for j in 0..out_features {
+            let mut sum = 0.0;
+            for k in 0..in_features {
+                sum += input.data()[k] * self.w.data()[j * in_features + k];
+            }
+            sum += self.b.data()[j];
+            out.data_mut()[j] = sum;
+        }
+        (
+            out,
+            LinearCache {
+                input: input.clone(),
+            },
+        )
+    }
+        let batch = grad_output.shape()[0];
         let in_features = cache.input.shape[1];
         let out_features = grad_output.shape[1];
         // dW shape [out_features, in_features]

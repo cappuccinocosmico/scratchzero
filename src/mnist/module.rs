@@ -1,4 +1,3 @@
-use crate::mnist::field::Field;
 use crate::mnist::tensor::Tensor;
 
 pub trait ModConfig {

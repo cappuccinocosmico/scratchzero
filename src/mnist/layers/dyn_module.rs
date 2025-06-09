@@ -87,14 +87,10 @@ where
         let gp = grad_param
             .downcast_ref::<M::Param>()
             .expect("param grad type mismatch");
-        self.update(&gp, lr);
+        self.update(gp, lr);
     }
 }
 
 pub fn dynify<M: Module + 'static>(module: M) -> Box<dyn DynModule> {
     Box::new(module)
-}
-
-fn test() -> Box<dyn DynModule> {
-    dynify(ReLU::<1>::default())
 }

@@ -1,3 +1,6 @@
+use std::range::Range;
+
+use rand::random_range;
 use smallvec::{SmallVec, ToSmallVec};
 
 const MAX_TENSOR_DIMENSION: usize = 5;
@@ -7,7 +10,7 @@ type flt = f32;
 #[derive(Clone, Debug)]
 pub struct Tensor<const dim: usize> {
     /// Shape, e.g., [batch, channels, height, width].
-    pub shape: [DimSizeType; dim],
+    shape: [DimSizeType; dim],
     /// Flattened data in row-major order.
     data: Vec<flt>,
 }
@@ -15,6 +18,9 @@ pub struct Tensor<const dim: usize> {
 #[derive(Clone, Copy, Debug)]
 pub struct WrongDimensionError;
 impl<const dim: usize> Tensor<dim> {
+    pub fn shape(&self) -> &[DimSizeType; dim] {
+        &self.shape
+    }
     /// Mutable access to underlying data.
     pub fn data_mut(&mut self) -> &mut [flt] {
         &mut self.data
@@ -51,6 +57,15 @@ impl<const dim: usize> Tensor<dim> {
             data: vec![0.0; size],
             shape,
         }
+    }
+    pub fn random(shape: [usize; dim]) -> Self {
+        let size = shape.iter().product();
+        let mut data = Vec::with_capacity(size);
+        for _ in 0..size {
+            let val: flt = random_range(-1.0..1.0);
+            data.push(val);
+        }
+        Self::from_vec_unchecked(data, shape)
     }
 
     /// Creates a new tensor from data and shape.

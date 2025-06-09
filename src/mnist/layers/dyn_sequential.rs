@@ -75,7 +75,7 @@ impl<T: SequenceConfig + 'static> Module for Sequential<T> {
             .collect();
 
         for reverse_index in 0..layer_len {
-            let index = layer_len - reverse_index - 1;
+            let index = (layer_len - 1) - reverse_index;
             let layer = &self.layers[index];
             let backward_boxes = layer.backward_boxed(current_grad_output, cache[index].as_ref());
             grad_params[index] = backward_boxes.grad_params;
@@ -102,5 +102,14 @@ impl SequenceConfig for TestConfig {
 }
 
 pub fn make_test_sequential() -> Sequential<TestConfig> {
-    Sequential::new(vec![dynify(ReLU::<1>)], TestConfig::default()).unwrap()
+    Sequential::new(
+        vec![
+            dynify(ReLU::<1>),
+            dynify(ReLU::<1>),
+            dynify(ReLU::<1>),
+            dynify(ReLU::<1>),
+        ],
+        TestConfig::default(),
+    )
+    .unwrap()
 }
