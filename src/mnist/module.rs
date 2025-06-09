@@ -1,19 +1,18 @@
 use crate::mnist::field::Field;
 use crate::mnist::tensor::Tensor;
 
-/// Each layer or model that has (optional) parameters implements `Module`.
-pub trait Module {
+pub trait ModConfig {
     /// The type of input this module consumes.
     type Input;
     /// The type of output this module produces.
     type Output;
-    /// The parameters of this module (pure values).
+    /// The type of this module (pure values), and also the type of the gradient.
     type Param;
-    /// The gradients of the parameters.
-    type ParamGrad;
     /// Any cached activations needed for backward.
     type Cache;
-
+}
+/// Each layer or model that has (optional) parameters implements `Module`.
+pub trait Module: ModConfig {
     /// Pure forward: returns output and cache needed for backward.
     fn forward(&self, input: &Self::Input) -> (Self::Output, Self::Cache);
 
@@ -24,8 +23,8 @@ pub trait Module {
         &self,
         grad_output: &Self::Output,
         cache: &Self::Cache,
-    ) -> (Self::Input, Self::ParamGrad);
+    ) -> (Self::Input, Self::Param);
 
     /// Apply an optimizer update to the parameters, given parameter gradients and learning rate.
-    fn update(&mut self, param_grad: &Self::ParamGrad, lr: f32);
+    fn update(&mut self, param_grad: &Self::Param, lr: f32);
 }

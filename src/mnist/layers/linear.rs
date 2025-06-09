@@ -1,4 +1,8 @@
-use crate::mnist::{field::Field, module::Module, tensor::Tensor};
+use crate::mnist::{
+    field::Field,
+    module::{ModConfig, Module},
+    tensor::Tensor,
+};
 
 /// Linear (Fully Connected) Layer
 pub struct Linear {
@@ -23,13 +27,14 @@ impl Linear {
     }
 }
 
-impl Module for Linear {
+impl ModConfig for Linear {
     type Input = Tensor<2>;
     type Output = Tensor<2>;
     type Param = (Tensor<2>, Tensor<1>);
-    type ParamGrad = (Tensor<2>, Tensor<1>);
     type Cache = LinearCache;
+}
 
+impl Module for Linear {
     fn forward(&self, input: &Self::Input) -> (Self::Output, Self::Cache) {
         let batch = input.shape[0];
         let in_features = input.shape[1];
@@ -59,7 +64,7 @@ impl Module for Linear {
         &self,
         grad_output: &Self::Output,
         cache: &Self::Cache,
-    ) -> (Self::Input, Self::ParamGrad) {
+    ) -> (Self::Input, Self::Param) {
         let batch = grad_output.shape[0];
         let in_features = cache.input.shape[1];
         let out_features = grad_output.shape[1];
@@ -85,7 +90,7 @@ impl Module for Linear {
         (dX, (dW, dB))
     }
 
-    fn update(&mut self, param_grad: &Self::ParamGrad, lr: f32) {
+    fn update(&mut self, param_grad: &Self::Param, lr: f32) {
         let (ref dW, ref dB) = *param_grad;
         // SGD update
         for (w_val, dw) in self.w.value.data_mut().iter_mut().zip(dW.data().iter()) {
@@ -96,4 +101,3 @@ impl Module for Linear {
         }
     }
 }
-
