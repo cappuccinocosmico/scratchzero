@@ -1,9 +1,5 @@
-use std::range::Range;
-
 use rand::random_range;
-use smallvec::{SmallVec, ToSmallVec};
 
-const MAX_TENSOR_DIMENSION: usize = 5;
 type DimSizeType = usize;
 type flt = f32;
 
