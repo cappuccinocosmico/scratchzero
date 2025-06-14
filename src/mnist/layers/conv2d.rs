@@ -1,4 +1,7 @@
-use crate::mnist::{module::{ModConfig, Module}, tensor::Tensor};
+use crate::mnist::{
+    module::{ModConfig, Module},
+    tensor::Tensor,
+};
 
 /// 2D Convolutional Layer (no dilation, no groups)
 pub struct Conv2d {
@@ -10,28 +13,40 @@ pub struct Conv2d {
 
 /// Cache for Conv2d layer
 pub struct Conv2dCache {
-    pub input: Tensor<3>,         // [in_channels, in_h, in_w]
-    pub padded_input: Tensor<3>,  // input after padding
+    pub input: Tensor<3>,        // [in_channels, in_h, in_w]
+    pub padded_input: Tensor<3>, // input after padding
 }
 
 impl Conv2d {
     /// Create a new Conv2d layer with random weights in [-1,1]
-    pub fn new(in_channels: usize, out_channels: usize, kernel_h: usize, kernel_w: usize, stride: usize, padding: usize) -> Self {
+    pub fn new(
+        in_channels: usize,
+        out_channels: usize,
+        kernel_h: usize,
+        kernel_w: usize,
+        stride: usize,
+        padding: usize,
+    ) -> Self {
         let weight = Tensor::<4>::random([out_channels, in_channels, kernel_h, kernel_w]);
         let bias = Tensor::<1>::random([out_channels]);
-        Conv2d { weight, bias, stride, padding }
+        Conv2d {
+            weight,
+            bias,
+            stride,
+            padding,
+        }
     }
 
     fn pad_input(input: &Tensor<3>, pad: usize) -> Tensor<3> {
         let [in_c, in_h, in_w] = *input.shape();
-        let padded_h = in_h + 2*pad;
-        let padded_w = in_w + 2*pad;
+        let padded_h = in_h + 2 * pad;
+        let padded_w = in_w + 2 * pad;
         let mut padded = Tensor::<3>::zeros([in_c, padded_h, padded_w]);
         for c in 0..in_c {
             for h in 0..in_h {
                 for w in 0..in_w {
-                    let src_idx = c*(in_h*in_w) + h*in_w + w;
-                    let dst_idx = c*(padded_h*padded_w) + (h+pad)*padded_w + (w+pad);
+                    let src_idx = c * (in_h * in_w) + h * in_w + w;
+                    let dst_idx = c * (padded_h * padded_w) + (h + pad) * padded_w + (w + pad);
                     padded.data_mut()[dst_idx] = input.data()[src_idx];
                 }
             }
@@ -66,27 +81,35 @@ impl Module for Conv2d {
                     for ic in 0..in_c {
                         for kh in 0..k_h {
                             for kw in 0..k_w {
-                                let ih = oh*stride + kh;
-                                let iw = ow*stride + kw;
-                                let inp_idx = ic*(p_h*p_w) + ih*p_w + iw;
-                                let w_idx = oc*(in_c*k_h*k_w) + ic*(k_h*k_w) + kh*k_w + kw;
+                                let ih = oh * stride + kh;
+                                let iw = ow * stride + kw;
+                                let inp_idx = ic * (p_h * p_w) + ih * p_w + iw;
+                                let w_idx =
+                                    oc * (in_c * k_h * k_w) + ic * (k_h * k_w) + kh * k_w + kw;
                                 sum += padded.data()[inp_idx] * self.weight.data()[w_idx];
                             }
                         }
                     }
                     sum += self.bias.data()[oc];
-                    let out_idx = oc*(out_h*out_w) + oh*out_w + ow;
+                    let out_idx = oc * (out_h * out_w) + oh * out_w + ow;
                     output.data_mut()[out_idx] = sum;
                 }
             }
         }
         (
             output,
-            Conv2dCache { input: input.clone(), padded_input: padded }
+            Conv2dCache {
+                input: input.clone(),
+                padded_input: padded,
+            },
         )
     }
 
-    fn backward(&self, grad_output: &Self::Output, cache: &Self::Cache) -> (Self::Input, Self::Param) {
+    fn backward(
+        &self,
+        grad_output: &Self::Output,
+        cache: &Self::Cache,
+    ) -> (Self::Input, Self::Param) {
         let input = &cache.input;
         let padded = &cache.padded_input;
         let [in_c, in_h, in_w] = *input.shape();
@@ -105,7 +128,7 @@ impl Module for Conv2d {
             let mut db = 0.0;
             for oh in 0..out_h {
                 for ow in 0..out_w {
-                    let go = grad_output.data()[oc*(out_h*out_w) + oh*out_w + ow];
+                    let go = grad_output.data()[oc * (out_h * out_w) + oh * out_w + ow];
                     db += go;
                 }
             }
@@ -116,17 +139,20 @@ impl Module for Conv2d {
                         let mut dw = 0.0;
                         for oh in 0..out_h {
                             for ow in 0..out_w {
-                                let ih = oh*stride + kh;
-                                let iw = ow*stride + kw;
-                                let inp = padded.data()[ic*(p_h*p_w) + ih*p_w + iw];
-                                let go = grad_output.data()[oc*(out_h*out_w) + oh*out_w + ow];
+                                let ih = oh * stride + kh;
+                                let iw = ow * stride + kw;
+                                let inp = padded.data()[ic * (p_h * p_w) + ih * p_w + iw];
+                                let go = grad_output.data()[oc * (out_h * out_w) + oh * out_w + ow];
                                 dw += inp * go;
                                 // grad input convolution
-                                let w_val = self.weight.data()[oc*(in_c*k_h*k_w) + ic*(k_h*k_w) + kh*k_w + kw];
-                                grad_input_padded.data_mut()[ic*(p_h*p_w) + ih*p_w + iw] += w_val * go;
+                                let w_val = self.weight.data()
+                                    [oc * (in_c * k_h * k_w) + ic * (k_h * k_w) + kh * k_w + kw];
+                                grad_input_padded.data_mut()[ic * (p_h * p_w) + ih * p_w + iw] +=
+                                    w_val * go;
                             }
                         }
-                        grad_weight.data_mut()[oc*(in_c*k_h*k_w) + ic*(k_h*k_w) + kh*k_w + kw] = dw;
+                        grad_weight.data_mut()
+                            [oc * (in_c * k_h * k_w) + ic * (k_h * k_w) + kh * k_w + kw] = dw;
                     }
                 }
             }
@@ -136,8 +162,9 @@ impl Module for Conv2d {
         for ic in 0..in_c {
             for h in 0..in_h {
                 for w in 0..in_w {
-                    let src = grad_input_padded.data()[ic*(p_h*p_w) + (h+pad)*p_w + (w+pad)];
-                    grad_input.data_mut()[ic*(in_h*in_w) + h*in_w + w] = src;
+                    let src =
+                        grad_input_padded.data()[ic * (p_h * p_w) + (h + pad) * p_w + (w + pad)];
+                    grad_input.data_mut()[ic * (in_h * in_w) + h * in_w + w] = src;
                 }
             }
         }
@@ -156,3 +183,4 @@ impl Module for Conv2d {
         }
     }
 }
+
